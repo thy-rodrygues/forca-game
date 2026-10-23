@@ -1,0 +1,286 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Jogo da Forca</title>
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
+  <!-- Lucide Icons -->
+  <script src="https://unpkg.com/lucide@latest"></script>
+  <style>
+    :root {
+      --background: 46 43% 95%;
+      --foreground: 165 24% 16%;
+      --primary: 164 43% 30%;
+      --accent: 15 82% 58%;
+      --muted-foreground: 162 10% 43%;
+    }
+    body {
+      min-height: 100vh;
+      margin: 0;
+      padding: 24px clamp(20px, 5vw, 76px) 34px;
+      background: radial-gradient(ellipse at 7% 4%, rgba(228, 195, 108, .19), transparent 28rem), hsl(46, 43%, 95%);
+      font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    }
+    .drawing-wrap {
+      height: 174px;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      margin: 16px 0 4px;
+      border-radius: 14px;
+      background: #f4f0e4;
+      box-shadow: inset 0 2px 4px rgba(0,0,0,0.03);
+    }
+    .hangman-svg {
+      width: 236px;
+      height: 165px;
+      overflow: visible;
+    }
+    .gallows {
+      fill: none;
+      stroke: #47685b;
+      stroke-width: 5;
+      stroke-linecap: round;
+      stroke-linejoin: round;
+    }
+    .figure {
+      fill: none;
+      stroke: #e06e4e;
+      stroke-width: 5;
+      stroke-linecap: round;
+      stroke-linejoin: round;
+      transition: all 0.3s ease;
+    }
+  </style>
+</head>
+<body class="flex flex-col items-center justify-between text-neutral-800 antialiased selection:bg-emerald-200">
+
+  <!-- Header -->
+  <header class="w-full max-w-2xl flex items-center justify-between mb-4">
+    <div class="flex items-center gap-2">
+      <div class="w-10 h-10 rounded-xl bg-[#2b594b] text-white flex items-center justify-center font-bold text-xl shadow-md">
+        🎯
+      </div>
+      <div>
+        <h1 class="text-xl font-bold tracking-tight text-[#1e3830]">Jogo da Forca</h1>
+      </div>
+    </div>
+    <div class="flex items-center gap-3">
+      <div class="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-[#e8e2d0] text-[#2b594b] font-medium text-sm">
+        <i data-lucide="trophy" class="w-4 h-4 text-amber-600"></i>
+        <span>Sequência: <span id="streak-count">0</span></span>
+      </div>
+      <button
+        onclick="resetGame()"
+        class="p-2 rounded-xl bg-[#2b594b] text-white hover:bg-[#1e3830] transition shadow-sm active:scale-95 cursor-pointer"
+        title="Reiniciar Jogo"
+      >
+        <i data-lucide="rotate-ccw" class="w-4 h-4"></i>
+      </button>
+    </div>
+  </header>
+
+  <!-- Main Container -->
+  <main class="w-full max-w-2xl bg-[#faf6ed] border border-[#e6dec6] rounded-3xl p-6 shadow-xl flex flex-col items-center relative overflow-hidden">
+    
+    <!-- Top info bar -->
+    <div class="w-full flex justify-end items-center mb-2 px-2 text-sm text-[#47685b] font-medium">
+      <div class="flex items-center gap-1.5">
+        <i data-lucide="heart" class="w-4 h-4 text-[#e06e4e] fill-[#e06e4e]"></i>
+        <span>Vidas: <span id="lives-count">6</span>/6</span>
+      </div>
+    </div>
+
+    <!-- Hangman Drawing Box -->
+    <div class="drawing-wrap w-full max-w-xs border border-[#e6dec6]">
+      <svg id="hangman-svg" class="hangman-svg" viewBox="0 0 240 170" role="img">
+        <g class="gallows">
+          <path d="M35 151h143M65 151V20h88v18M65 48l-18 18" />
+        </g>
+        <g id="figure-parts" class="figure">
+          <!-- Partes injetadas via JS -->
+        </g>
+      </svg>
+    </div>
+
+    <!-- Word Display -->
+    <div id="word-container" class="my-8 flex flex-wrap justify-center gap-3">
+      <!-- Letras geradas via JS -->
+    </div>
+
+    <!-- Game Over / Win Modal Overlay -->
+    <div id="game-modal" class="hidden absolute inset-0 bg-neutral-900/40 backdrop-blur-xs flex items-center justify-center p-4 z-20">
+      <div class="bg-[#faf6ed] border border-[#e6dec6] rounded-2xl p-6 max-w-sm w-full text-center shadow-2xl">
+        <div id="modal-icon-wrap" class="flex justify-center mb-3">
+          <!-- Ícone injetado via JS -->
+        </div>
+        <h2 id="modal-title" class="text-xl font-bold text-[#1e3830] mb-1"></h2>
+        <p id="modal-desc" class="text-sm text-[#47685b] mb-4"></p>
+        <div class="bg-[#f4f0e4] p-3 rounded-xl mb-6 border border-[#e6dec6]">
+          <span class="text-xs text-[#47685b] block uppercase tracking-wider mb-1 font-semibold">Palavra Secreta</span>
+          <span id="modal-secret-word" class="text-lg font-bold text-[#1e3830] uppercase tracking-widest"></span>
+        </div>
+        <button
+          onclick="resetGame()"
+          class="w-full py-3 px-4 rounded-xl bg-[#2b594b] text-white font-semibold hover:bg-[#1e3830] transition shadow-md active:scale-98 flex items-center justify-center gap-2 cursor-pointer"
+        >
+          <i data-lucide="rotate-ccw" class="w-4 h-4"></i>
+          Jogar Novamente
+        </button>
+      </div>
+    </div>
+
+    <!-- Virtual Keyboard -->
+    <div id="keyboard-container" class="w-full mt-2 grid grid-cols-7 sm:grid-cols-9 gap-1.5 sm:gap-2">
+      <!-- Teclas geradas via JS -->
+    </div>
+
+  </main>
+
+  <!-- Footer info -->
+  <footer class="mt-6 text-center text-xs text-[#47685b]">
+    Criado com base no seu algoritmo em Python • Versão Web Pronta para Navegador
+  </footer>
+
+  <script>
+    const WORDS = [
+      "python", "programacao", "computador", "desenvolvedor",
+      "algoritmo", "variavel", "funcao", "tecnologia",
+      "inteligencia", "engenharia"
+    ];
+    const ALPHABET = "abcdefghijklmnopqrstuvwxyz".split("");
+
+    let word = "";
+    let guessedLetters = new Set();
+    let streak = 0;
+
+    function initGame() {
+      const randomIndex = Math.floor(Math.random() * WORDS.length);
+      word = WORDS[randomIndex];
+      guessedLetters.clear();
+      render();
+    }
+
+    function resetGame() {
+      const incorrectLetters = Array.from(guessedLetters).filter(l => !word.includes(l));
+      const mistakes = incorrectLetters.length;
+      const isWon = word.split("").every(l => guessedLetters.has(l));
+      const isLost = mistakes >= 6;
+
+      if (isWon) streak++;
+      else if (isLost) streak = 0;
+
+      let newWord;
+      do {
+        newWord = WORDS[Math.floor(Math.random() * WORDS.length)];
+      } while (newWord === word && WORDS.length > 1);
+
+      word = newWord;
+      guessedLetters.clear();
+      render();
+    }
+
+    function handleGuess(letter) {
+      const incorrectLetters = Array.from(guessedLetters).filter(l => !word.includes(l));
+      const isWon = word.split("").every(l => guessedLetters.has(l));
+      const isLost = incorrectLetters.length >= 6;
+      if (isWon || isLost || guessedLetters.has(letter)) return;
+
+      guessedLetters.add(letter);
+      render();
+    }
+
+    // Suporte ao teclado físico
+    window.addEventListener('keypress', (e) => {
+      const key = e.key.toLowerCase();
+      if (key.length === 1 && key >= 'a' && key <= 'z') {
+        handleGuess(key);
+      }
+    });
+
+    function render() {
+      const incorrectLetters = Array.from(guessedLetters).filter(l => !word.includes(l));
+      const mistakes = incorrectLetters.length;
+      const maxLives = 6;
+      const livesLeft = maxLives - mistakes;
+      const isWon = word.split("").every(l => guessedLetters.has(l));
+      const isLost = mistakes >= maxLives;
+      const isGameOver = isWon || isLost;
+
+      // Atualizar estatísticas e vidas
+      document.getElementById('streak-count').innerText = streak;
+      document.getElementById('lives-count').innerText = livesLeft;
+
+      // Desenho da Forca SVG
+      const figurePartsEl = document.getElementById('figure-parts');
+      let svgContent = '';
+      if (mistakes >= 1) svgContent += '<circle cx="153" cy="55" r="17" />';
+      if (mistakes >= 2) svgContent += '<path d="M153 72v40" />';
+      if (mistakes >= 3) svgContent += '<path d="m153 83-24 18" />';
+      if (mistakes >= 4) svgContent += '<path d="m153 83 24 18" />';
+      if (mistakes >= 5) svgContent += '<path d="m153 112-21 26" />';
+      if (mistakes >= 6) svgContent += '<path d="m153 112 21 26" />';
+      figurePartsEl.innerHTML = svgContent;
+
+      // Exibição da Palavra
+      const wordContainer = document.getElementById('word-container');
+      wordContainer.innerHTML = word.split("").map(letter => {
+        const revealed = guessedLetters.has(letter) || isGameOver;
+        return `
+          <div class="w-10 h-12 sm:w-12 sm:h-14 border-b-4 flex items-center justify-center text-2xl sm:text-3xl font-bold uppercase transition-all duration-300 ${
+            revealed ? 'border-[#2b594b] text-[#1e3830]' : 'border-[#b5a88f] text-transparent'
+          }">
+            ${revealed ? letter : '_'}
+          </div>
+        `;
+      }).join('');
+
+      // Modal de Fim de Jogo
+      const modal = document.getElementById('game-modal');
+      if (isGameOver) {
+        modal.classList.remove('hidden');
+        document.getElementById('modal-title').innerText = isWon ? "Parabéns! Você Venceu!" : "Fim de Jogo!";
+        document.getElementById('modal-desc').innerText = isWon ? "Você descobriu a palavra secreta com sucesso!" : "Suas vidas acabaram desta vez.";
+        document.getElementById('modal-secret-word').innerText = word;
+        document.getElementById('modal-icon-wrap').innerHTML = isWon 
+          ? '<div class="w-14 h-14 rounded-full bg-emerald-100 text-emerald-600 flex items-center justify-center text-2xl shadow-inner">🎉</div>'
+          : '<div class="w-14 h-14 rounded-full bg-rose-100 text-rose-600 flex items-center justify-center text-2xl shadow-inner">💀</div>';
+      } else {
+        modal.classList.add('hidden');
+      }
+
+      // Teclado Virtual
+      const keyboardContainer = document.getElementById('keyboard-container');
+      keyboardContainer.innerHTML = ALPHABET.map(letter => {
+        const isGuessed = guessedLetters.has(letter);
+        const isCorrect = isGuessed && word.includes(letter);
+        const isIncorrect = isGuessed && !word.includes(letter);
+
+        let btnStyle = "bg-[#f4f0e4] text-[#1e3830] hover:bg-[#e8e2d0] border-[#d8cdb4]";
+        if (isCorrect) {
+          btnStyle = "bg-[#2b594b] text-white border-[#2b594b] shadow-xs";
+        } else if (isIncorrect) {
+          btnStyle = "bg-[#e06e4e]/15 text-[#b84a29] border-[#e06e4e]/30 opacity-60";
+        }
+
+        return `
+          <button
+            onclick="handleGuess('${letter}')"
+            ${isGuessed || isGameOver ? 'disabled' : ''}
+            class="py-2.5 sm:py-3 rounded-xl font-bold uppercase text-sm sm:text-base border transition-all duration-200 active:scale-95 disabled:cursor-not-allowed cursor-pointer ${btnStyle}"
+          >
+            ${letter}
+          </button>
+        `;
+      }).join('');
+
+      lucide.createIcons();
+    }
+
+    // Iniciar o jogo ao carregar a página
+    initGame();
+  </script>
+</body>
+</html>
